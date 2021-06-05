@@ -1,49 +1,50 @@
-'use strict';
+"use strict";
 
-const { remote } = require('electron');
-const Store = require('electron-store');
-let Holidays = require('date-holidays');
+const { remote } = require("electron");
+const Store = require("electron-store");
+let Holidays = require("date-holidays");
 
-const { getUserPreferences, showDay } = require('../js/user-preferences.js');
-const { validateTime, diffDays } = require('../js/time-math.js');
-const { applyTheme } = require('../js/themes.js');
-const { getDateStr } = require('../js/date-aux.js');
-const { bindDevToolsShortcut, showAlert, showDialog } = require('../js/window-aux.js');
-const i18n = require('./configs/i18next.config.js');
+const { getUserPreferences, showDay } = require("../js/user-preferences.js");
+const { validateTime, diffDays } = require("../js/time-math.js");
+const { applyTheme } = require("../js/themes.js");
+const { getDateStr } = require("../js/date-aux.js");
+const {
+    bindDevToolsShortcut,
+    showAlert,
+    showDialog
+} = require("../js/window-aux.js");
+const i18n = require("./configs/i18next.config.js");
 
-const $ = require('jquery');
-const jqueryI18next = require('jquery-i18next');
+const $ = require("jquery");
+const jqueryI18next = require("jquery-i18next");
 
-const waiverStore = new Store({name: 'waived-workdays'});
+const waiverStore = new Store({ name: "waived-workdays" });
 let hd = new Holidays();
 
-function setDates(day)
-{
-    $('#start-date').val(day);
-    $('#end-date').val(day);
+function setDates(day) {
+    $("#start-date").val(day);
+    $("#end-date").val(day);
 }
 
-function setHours()
-{
+function setHours() {
     let usersStyles = getUserPreferences();
-    $('#hours').val(usersStyles['hours-per-day']);
+    $("#hours").val(usersStyles["hours-per-day"]);
 }
 
-function toggleAddButton(buttonName, state)
-{
-    if (state)
-    {
-        $(`#${buttonName}`).removeAttr('disabled');
-    }
-    else
-    {
-        $(`#${buttonName}`).attr('disabled', 'disabled');
+function toggleAddButton(buttonName, state) {
+    if (state) {
+        $(`#${buttonName}`).removeAttr("disabled");
+    } else {
+        $(`#${buttonName}`).attr("disabled", "disabled");
     }
 }
+function checkIfValidHours() {
+    var hourString = $(`#hours`).val();
+    return hourString.match(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/);
+}
 
-function addRowToListTable(day, reason, hours)
-{
-    let table = $('#waiver-list-table tbody')[0],
+function addRowToListTable(day, reason, hours) {
+    let table = $("#waiver-list-table tbody")[0],
         row = table.insertRow(0),
         delButtonCell = row.insertCell(0),
         dayCell = row.insertCell(1),
@@ -53,87 +54,90 @@ function addRowToListTable(day, reason, hours)
     dayCell.innerHTML = day;
     reasonCell.innerHTML = reason;
     hoursCell.innerHTML = hours;
-    let id = 'delete-' + day;
-    delButtonCell.innerHTML = '<input class="delete-btn" data-day="' + day + '" id="' + id + '" type="button"></input>';
+    let id = "delete-" + day;
+    delButtonCell.innerHTML =
+        '<input class="delete-btn" data-day="' +
+        day +
+        '" id="' +
+        id +
+        '" type="button"></input>';
 
-    $('#'+ id).on('click', deleteEntryOnClick);
+    $("#" + id).on("click", deleteEntryOnClick);
 }
 
-function populateList()
-{
+function populateList() {
     clearWaiverList();
-    for (const elem of waiverStore)
-    {
+    for (const elem of waiverStore) {
         let date = elem[0],
-            reason = elem[1]['reason'],
-            hours = elem[1]['hours'];
+            reason = elem[1]["reason"],
+            hours = elem[1]["hours"];
         addRowToListTable(date, reason, hours);
     }
 }
 
-function getDateFromISOStr(isoStr)
-{
-    return isoStr.split('-');
+function getDateFromISOStr(isoStr) {
+    return isoStr.split("-");
 }
 
-function addWaiver()
-{
-    let [startYear, startMonth, startDay] = getDateFromISOStr($('#start-date').val());
-    let [endYear, endMonth, endDay] = getDateFromISOStr($('#end-date').val());
+function addWaiver() {
+    let [startYear, startMonth, startDay] = getDateFromISOStr(
+        $("#start-date").val()
+    );
+    let [endYear, endMonth, endDay] = getDateFromISOStr($("#end-date").val());
 
-    let startDate = new Date(startYear, startMonth-1, startDay),
-        endDate = new Date(endYear, endMonth-1, endDay),
-        reason = $('#reason').val(),
-        hours = $('#hours').val();
+    let startDate = new Date(startYear, startMonth - 1, startDay),
+        endDate = new Date(endYear, endMonth - 1, endDay),
+        reason = $("#reason").val(),
+        hours = $("#hours").val();
 
-    if (!(validateTime(hours)))
-    {
+    if (!validateTime(hours)) {
         // The error is shown in the page, no need to handle it here
         return false;
     }
 
     let diff = diffDays(startDate, endDate);
 
-    if (diff < 0)
-    {
-        showAlert(i18n.t('$WorkdayWaiver.end-date-cannot-be-less'));
+    if (diff < 0) {
+        showAlert(i18n.t("$WorkdayWaiver.end-date-cannot-be-less"));
         return false;
     }
 
     let tempDate = new Date(startDate);
     let noWorkingDaysOnRange = true;
-    for (let i = 0; i <= diff; i++)
-    {
+    for (let i = 0; i <= diff; i++) {
         let tempDateStr = getDateStr(tempDate);
-        let alreadyHaveWaiverStr = i18n.t('$WorkdayWaiver.already-have-waiver');
-        let removeWaiverStr = i18n.t('$WorkdayWaiver.remove-waiver');
+        let alreadyHaveWaiverStr = i18n.t("$WorkdayWaiver.already-have-waiver");
+        let removeWaiverStr = i18n.t("$WorkdayWaiver.remove-waiver");
         let [tempYear, tempMonth, tempDay] = getDateFromISOStr(tempDateStr);
-        noWorkingDaysOnRange &= !showDay(tempYear, tempMonth-1, tempDay) && !waiverStore.has(tempDateStr);
+        noWorkingDaysOnRange &=
+            !showDay(tempYear, tempMonth - 1, tempDay) &&
+            !waiverStore.has(tempDateStr);
 
-        if (waiverStore.has(tempDateStr))
-        {
-            showAlert(`${alreadyHaveWaiverStr} ${tempDateStr}. ${removeWaiverStr}`);
+        if (waiverStore.has(tempDateStr)) {
+            showAlert(
+                `${alreadyHaveWaiverStr} ${tempDateStr}. ${removeWaiverStr}`
+            );
             return false;
         }
 
         tempDate.setDate(tempDate.getDate() + 1);
     }
 
-    if (noWorkingDaysOnRange)
-    {
-        showAlert(i18n.t('$WorkdayWaiver.no-working-days-on-range'));
+    if (noWorkingDaysOnRange) {
+        showAlert(i18n.t("$WorkdayWaiver.no-working-days-on-range"));
         return false;
     }
 
     tempDate = new Date(startDate);
 
-    for (let i = 0; i <= diff; i++)
-    {
+    for (let i = 0; i <= diff; i++) {
         let tempDateStr = getDateStr(tempDate);
         let [tempYear, tempMonth, tempDay] = getDateFromISOStr(tempDateStr);
-        if (showDay(tempYear, tempMonth-1, tempDay) && !waiverStore.has(tempDateStr))
-        {
-            waiverStore.set(tempDateStr, { 'reason' : reason, 'hours' : hours });
+        if (
+            showDay(tempYear, tempMonth - 1, tempDay) &&
+            !waiverStore.has(tempDateStr)
+        ) {
+            waiverStore.set(tempDateStr, { reason: reason, hours: hours });
             addRowToListTable(tempDateStr, reason, hours);
         }
 
@@ -141,142 +145,156 @@ function addWaiver()
     }
 
     //Cleanup
-    $('#reason').val('');
-    toggleAddButton('waive-button', $('#reason').val());
+    $("#reason").val("");
+    toggleAddButton("waive-button", $("#reason").val());
 }
 
-function deleteEntryOnClick(event)
-{
+function deleteEntryOnClick(event) {
     let deleteButton = $(event.target);
-    let day = deleteButton.data('day');
-    let timeToLeaveStr = i18n.t('$WorkdayWaiver.time-to-leave');
-    let deleteWaiverMessageStr = i18n.t('$WorkdayWaiver.delete-waiver-message');
+    let day = deleteButton.data("day");
+    let timeToLeaveStr = i18n.t("$WorkdayWaiver.time-to-leave");
+    let deleteWaiverMessageStr = i18n.t("$WorkdayWaiver.delete-waiver-message");
 
     let options = {
         title: timeToLeaveStr,
         message: `${deleteWaiverMessageStr} ${day} ?`,
-        type: 'info',
-        buttons: [i18n.t('$WorkdayWaiver.yes'), i18n.t('$WorkdayWaiver.no')]
+        type: "info",
+        buttons: [i18n.t("$WorkdayWaiver.yes"), i18n.t("$WorkdayWaiver.no")]
     };
-    showDialog(options, (result) =>
-    {
+    showDialog(options, result => {
         const buttonId = result.response;
-        if (buttonId === 1)
-        {
+        if (buttonId === 1) {
             return;
         }
         waiverStore.delete(day);
 
-        let row = deleteButton.closest('tr');
+        let row = deleteButton.closest("tr");
         row.remove();
     });
 }
 
-function populateCountry()
-{
-    $('#country').empty();
-    $('#country').append($('<option></option>').val('--').html('--'));
-    $.each(hd.getCountries(), function(i, p)
-    {
-        $('#country').append($('<option></option>').val(i).html(p));
+function populateCountry() {
+    $("#country").empty();
+    $("#country").append(
+        $("<option></option>")
+            .val("--")
+            .html("--")
+    );
+    $.each(hd.getCountries(), function(i, p) {
+        $("#country").append(
+            $("<option></option>")
+                .val(i)
+                .html(p)
+        );
     });
 }
 
-function populateState(country)
-{
+function populateState(country) {
     let states = hd.getStates(country);
-    if (states)
-    {
-        $('#state').empty();
-        $('#state').append($('<option></option>').val('--').html('--'));
-        $.each(states, function(i, p)
-        {
-            $('#state').append($('<option></option>').val(i).html(p));
+    if (states) {
+        $("#state").empty();
+        $("#state").append(
+            $("<option></option>")
+                .val("--")
+                .html("--")
+        );
+        $.each(states, function(i, p) {
+            $("#state").append(
+                $("<option></option>")
+                    .val(i)
+                    .html(p)
+            );
         });
-        $('#state').show();
-        $('#holiday-state').show();
-    }
-    else
-    {
-        $('#state').hide();
-        $('#holiday-state').hide();
+        $("#state").show();
+        $("#holiday-state").show();
+    } else {
+        $("#state").hide();
+        $("#holiday-state").hide();
     }
 }
-function populateCity(country, state)
-{
+function populateCity(country, state) {
     let regions = hd.getRegions(country, state);
-    if (regions)
-    {
-        $('#city').empty();
-        $('#city').append($('<option></option>').val('--').html('--'));
-        $.each(regions, function(i, p)
-        {
-            $('#city').append($('<option></option>').val(i).html(p));
+    if (regions) {
+        $("#city").empty();
+        $("#city").append(
+            $("<option></option>")
+                .val("--")
+                .html("--")
+        );
+        $.each(regions, function(i, p) {
+            $("#city").append(
+                $("<option></option>")
+                    .val(i)
+                    .html(p)
+            );
         });
-        $('#city').show();
-        $('#holiday-city').show();
-    }
-    else
-    {
-        $('#city').hide();
-        $('#holiday-city').hide();
+        $("#city").show();
+        $("#holiday-city").show();
+    } else {
+        $("#city").hide();
+        $("#holiday-city").hide();
     }
 }
 
-function populateYear()
-{
+function populateYear() {
     let year = new Date().getFullYear();
     let obj = {};
-    for (let i = year; i < year + 10; i++)
-    {
+    for (let i = year; i < year + 10; i++) {
         obj[i] = i;
     }
-    $('#year').empty();
-    $.each(obj, function(i, p)
-    {
-        $('#year').append($('<option></option>').val(p).html(p));
+    $("#year").empty();
+    $.each(obj, function(i, p) {
+        $("#year").append(
+            $("<option></option>")
+                .val(p)
+                .html(p)
+        );
     });
 }
 
-function getHolidays()
-{
-    let year = $('#year').find(':selected').val(),
-        country = $('#country').find(':selected') ? $('#country').find(':selected').val() : undefined,
-        state = $('#state').find(':selected') ? $('#state').find(':selected').val() : undefined,
-        city = $('#city').find(':selected') ? $('#city').find(':selected').val() : undefined;
-    if (country === undefined)
-    {
+function getHolidays() {
+    let year = $("#year")
+            .find(":selected")
+            .val(),
+        country = $("#country").find(":selected")
+            ? $("#country")
+                  .find(":selected")
+                  .val()
+            : undefined,
+        state = $("#state").find(":selected")
+            ? $("#state")
+                  .find(":selected")
+                  .val()
+            : undefined,
+        city = $("#city").find(":selected")
+            ? $("#city")
+                  .find(":selected")
+                  .val()
+            : undefined;
+    if (country === undefined) {
         return [];
     }
-    if (state !== undefined && city !== undefined)
-    {
+    if (state !== undefined && city !== undefined) {
         hd.init(country, state, city);
-    }
-    else if (state !== undefined && state !== '--' )
-    {
+    } else if (state !== undefined && state !== "--") {
         hd.init(country, state);
-    }
-    else
-    {
+    } else {
         hd.init(country);
     }
 
     return hd.getHolidays(year);
 }
 
-function iterateOnHolidays(funct)
-{
+function iterateOnHolidays(funct) {
     let holidays = getHolidays();
 
-    for (let holiday of holidays)
-    {
-        let startDate = new Date(holiday['start']),
-            endDate = new Date(holiday['end']),
-            reason = holiday['name'];
+    for (let holiday of holidays) {
+        let startDate = new Date(holiday["start"]),
+            endDate = new Date(holiday["end"]),
+            reason = holiday["name"];
         let diff = diffDays(startDate, endDate) - 1;
         let tempDate = new Date(startDate);
-        for (let i = 0; i <= diff; i++)
-        {
+        for (let i = 0; i <= diff; i++) {
             let tempDateStr = getDateStr(tempDate);
             funct(tempDateStr, reason);
             tempDate.setDate(tempDate.getDate() + 1);
@@ -284,9 +302,8 @@ function iterateOnHolidays(funct)
     }
 }
 
-function addHolidayToList(day, reason, workingDay, conflicts)
-{
-    let table = $('#holiday-list-table tbody')[0],
+function addHolidayToList(day, reason, workingDay, conflicts) {
+    let table = $("#holiday-list-table tbody")[0],
         row = table.insertRow(table.rows.length),
         dayCell = row.insertCell(0),
         reasonCell = row.insertCell(1),
@@ -297,153 +314,161 @@ function addHolidayToList(day, reason, workingDay, conflicts)
     dayCell.innerHTML = day;
     reasonCell.innerHTML = reason;
     workingDayCell.innerHTML = workingDay;
-    if (workingDay === 'No')
-        $(row.cells[2]).addClass('text-danger');
-    if (conflicts)
-        $(row.cells[3]).addClass('text-danger');
+    if (workingDay === "No") $(row.cells[2]).addClass("text-danger");
+    if (conflicts) $(row.cells[3]).addClass("text-danger");
     conflictsCell.innerHTML = conflicts;
-    importCell.innerHTML = `<label class="switch"><input type="checkbox" checked="${conflicts || workingDay === 'No' ? '' : 'checked'}" name="import-${day}" id="import-${day}"><span class="slider round"></span></label>`;
+    importCell.innerHTML = `<label class="switch"><input type="checkbox" checked="${
+        conflicts || workingDay === "No" ? "" : "checked"
+    }" name="import-${day}" id="import-${day}"><span class="slider round"></span></label>`;
 }
 
-function clearHolidayTable()
-{
-    clearTable('holiday-list-table');
+function clearHolidayTable() {
+    clearTable("holiday-list-table");
 }
 
-function clearWaiverList()
-{
-    clearTable('waiver-list-table');
+function clearWaiverList() {
+    clearTable("waiver-list-table");
 }
 
-function clearTable(id)
-{
+function clearTable(id) {
     let table = $(`#${id} tbody`)[0];
     // Clear all rows before adding new ones
-    while (table.rows.length >= 1)
-    {
+    while (table.rows.length >= 1) {
         table.rows[0].remove();
     }
 }
 
-function loadHolidaysTable()
-{
+function loadHolidaysTable() {
     let holidays = getHolidays();
-    if (holidays.length === 0)
-    {
+    if (holidays.length === 0) {
         return;
     }
 
     // Clear all rows before adding new ones
     clearHolidayTable();
 
-    function addHoliday(holidayDate, holidayReason)
-    {
+    function addHoliday(holidayDate, holidayReason) {
         let [tempYear, tempMonth, tempDay] = getDateFromISOStr(holidayDate);
         // Holiday returns month with 1-12 index, but showDay expects 0-11
-        let workingDay = showDay(tempYear, tempMonth - 1, tempDay) ? i18n.t('$WorkdayWaiver.yes') : i18n.t('$WorkdayWaiver.no');
+        let workingDay = showDay(tempYear, tempMonth - 1, tempDay)
+            ? i18n.t("$WorkdayWaiver.yes")
+            : i18n.t("$WorkdayWaiver.no");
         let conflicts = waiverStore.get(holidayDate);
-        addHolidayToList(holidayDate, holidayReason, workingDay, conflicts ? conflicts['reason'] : '');
+        addHolidayToList(
+            holidayDate,
+            holidayReason,
+            workingDay,
+            conflicts ? conflicts["reason"] : ""
+        );
     }
 
     iterateOnHolidays(addHoliday);
     // Show table and enable button
-    $('#holiday-list-table').show();
-    toggleAddButton('holiday-button', true);
+    $("#holiday-list-table").show();
+    toggleAddButton("holiday-button", true);
 }
 
-function addHolidaysAsWaiver()
-{
-    function addHoliday(holidayDate, holidayReason)
-    {
+function addHolidaysAsWaiver() {
+    function addHoliday(holidayDate, holidayReason) {
         let importHoliday = $(`#import-${holidayDate}`)[0].checked;
-        if (importHoliday)
-        {
-            waiverStore.set(holidayDate, { 'reason' : holidayReason, 'hours' : '08:00' });
-            addRowToListTable(holidayDate, holidayReason, '08:00');
+        if (importHoliday) {
+            waiverStore.set(holidayDate, {
+                reason: holidayReason,
+                hours: "08:00"
+            });
+            addRowToListTable(holidayDate, holidayReason, "08:00");
         }
     }
     iterateOnHolidays(addHoliday);
 
     //clear data from table and return the configurations to default
     initializeHolidayInfo();
-    showAlert(i18n.t('$WorkdayWaiver.loaded-waivers-holidays'));
+    showAlert(i18n.t("$WorkdayWaiver.loaded-waivers-holidays"));
 }
 
-function initializeHolidayInfo()
-{
-    toggleAddButton('holiday-button', false);
+function initializeHolidayInfo() {
+    toggleAddButton("holiday-button", false);
     populateYear();
     populateCountry();
-    $('#holiday-list-table').hide();
-    $('#state').hide();
-    $('#holiday-state').hide();
-    $('#city').hide();
-    $('#holiday-city').hide();
+    $("#holiday-list-table").hide();
+    $("#state").hide();
+    $("#holiday-state").hide();
+    $("#city").hide();
+    $("#holiday-city").hide();
 
-    $('#holiday-list-table').hide();
+    $("#holiday-list-table").hide();
     // Clear all rows before adding new ones
     clearHolidayTable();
 }
 
-function translatePage(language)
-{
-    $('html').attr('lang', language);
-    $('body').localize();
-    $('title').localize();
-    $('label').localize();
-    $('div').localize();
+function translatePage(language) {
+    $("html").attr("lang", language);
+    $("body").localize();
+    $("title").localize();
+    $("label").localize();
+    $("div").localize();
 }
 
-i18n.on('loaded', () =>
-{
+i18n.on("loaded", () => {
     const usersStyles = getUserPreferences();
-    i18n.changeLanguage(usersStyles['language']);
-    i18n.off('loadded');
-    i18n.off('languageChanged');
+    i18n.changeLanguage(usersStyles["language"]);
+    i18n.off("loadded");
+    i18n.off("languageChanged");
 
     jqueryI18next.init(i18n, $);
     translatePage(i18n.language);
 });
 
-$(() =>
-{
+$(() => {
     let preferences = getUserPreferences();
     applyTheme(preferences.theme);
 
-    setDates(remote.getGlobal('waiverDay'));
+    setDates(remote.getGlobal("waiverDay"));
     setHours();
-    toggleAddButton('waive-button', $('#reason').val());
+    toggleAddButton("waive-button", $("#reason").val());
 
     populateList();
 
-    $('#reason').on('keyup', () =>
-    {
-        toggleAddButton('waive-button', $('#reason').val());
+    $("#hours").on("input", () => {
+        if (checkIfValidHours())
+            toggleAddButton("waive-button", $("#reason").val());
+        else toggleAddButton("waive-button", false);
     });
 
-    $('#waive-button').on('click', () =>
-    {
+    $("#reason").on("input", () => {
+        if (checkIfValidHours())
+            toggleAddButton("waive-button", $("#reason").val());
+    });
+
+    $("#waive-button").on("click", () => {
         addWaiver();
     });
 
-    $('#holiday-button').on('click', () =>
-    {
+    $("#holiday-button").on("click", () => {
         addHolidaysAsWaiver();
     });
 
     initializeHolidayInfo();
-    $('#country').on('change', function()
-    {
-        populateState($(this).find(':selected').val());
+    $("#country").on("change", function() {
+        populateState(
+            $(this)
+                .find(":selected")
+                .val()
+        );
         loadHolidaysTable();
     });
-    $('#state').on('change', function()
-    {
-        populateCity($('#country').find(':selected').val(), $(this).find(':selected').val());
+    $("#state").on("change", function() {
+        populateCity(
+            $("#country")
+                .find(":selected")
+                .val(),
+            $(this)
+                .find(":selected")
+                .val()
+        );
         loadHolidaysTable();
     });
-    $('#city').on('change', function()
-    {
+    $("#city").on("change", function() {
         loadHolidaysTable();
     });
 
@@ -468,5 +493,5 @@ module.exports = {
     populateYear,
     setDates,
     setHours,
-    toggleAddButton,
+    toggleAddButton
 };
