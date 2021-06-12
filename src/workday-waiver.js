@@ -416,7 +416,7 @@ $(() =>
 
     populateList();
 
-    $('#reason').on('keyup', () =>
+    $('#reason').on('input', () =>
     {
         toggleAddButton('waive-button', $('#reason').val());
     });
