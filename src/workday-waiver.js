@@ -416,7 +416,7 @@ $(() =>
 
     populateList();
 
-    $('#reason, #hours').on('input', () =>
+    $('#reason, #hours').on('input blur', () =>
     {
         toggleAddButton('waive-button', $('#reason').val() && $('#hours')[0].checkValidity());
     });
